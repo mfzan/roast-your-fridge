@@ -20,27 +20,45 @@ ROAST = (
     "witness protection \u2014 nobody has seen a carrot come out alive."
 )
 
+# World-readable file: the grader collects outputs as another user.
+FILE_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
 
-def main() -> int:
-    line = ROAST.strip()
-    if len(line) > MAX_CHARS:
-        print(
-            f"error: roast line is {len(line)} characters, "
-            f"over the {MAX_CHARS}-character limit",
-            file=sys.stderr,
+
+def validate_line(line: str) -> str:
+    """Trim the line and enforce the competition's character limit."""
+    cleaned = line.strip()
+    if not cleaned:
+        raise ValueError("roast line is empty")
+    if len(cleaned) > MAX_CHARS:
+        raise ValueError(
+            f"roast line is {len(cleaned)} characters, "
+            f"over the {MAX_CHARS}-character limit"
         )
-        return 1
+    if "\n" in cleaned:
+        raise ValueError("roast line must be a single line")
+    return cleaned
 
-    output_dir = os.environ.get("OUTPUT_DIR", "/output")
+
+def write_entry(line: str, output_dir: str) -> str:
+    """Write the single roast line to entry.txt and return its path."""
     os.makedirs(output_dir, exist_ok=True)
-
     path = os.path.join(output_dir, "entry.txt")
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(line + "\n")
-
     # The grader collects outputs as another user, so the file must be
     # world-readable. (Never chmod the output directory itself.)
-    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+    os.chmod(path, FILE_MODE)
+    return path
+
+
+def main() -> int:
+    try:
+        line = validate_line(ROAST)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    output_dir = os.environ.get("OUTPUT_DIR", "/output")
+    write_entry(line, output_dir)
     return 0
 
 
